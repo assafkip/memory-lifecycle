@@ -272,14 +272,35 @@ def main():
             output_lines.append(f"  {filename}: {old} -> {new}")
         output_lines.append("")
 
-    # 4. Update index if anything changed
-    if archived or promoted:
+    # 4. Pitfall detection from last session
+    try:
+        from detect_pitfalls import run_pitfall_detection
+        pitfalls = run_pitfall_detection()
+    except ImportError:
+        # detect-pitfalls.py not found (standalone run), try relative import
+        try:
+            hook_dir = os.path.dirname(os.path.abspath(__file__))
+            sys.path.insert(0, hook_dir)
+            from detect_pitfalls import run_pitfall_detection
+            pitfalls = run_pitfall_detection()
+        except ImportError:
+            pitfalls = []
+
+    if pitfalls:
+        output_lines.append(f"PITFALL DETECTION: {len(pitfalls)} correction(s) from last session")
+        for f in pitfalls:
+            output_lines.append(f"  -> {f}")
+        output_lines.append("(Auto-created fast-decay memories. Review and update the originals.)")
+        output_lines.append("")
+
+    # 5. Update index if anything changed
+    if archived or promoted or pitfalls:
         update_memory_index(memory_dir)
 
-    # 5. Save state
+    # 6. Save state
     save_state(memory_dir, state)
 
-    # 6. Print output
+    # 7. Print output
     if output_lines:
         output_lines.append("=" * 50)
         print("\n".join(output_lines))

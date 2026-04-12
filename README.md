@@ -76,12 +76,14 @@ That's it. No config. No API keys. No database. The plugin hooks into Claude Cod
 
 ## What's inside
 
-Four files. 230 lines of Python. Zero dependencies.
+Six files. ~550 lines of Python. Zero dependencies.
 
-- `hooks/session-start.py` - the hook that checks, archives, and promotes
-- `rules/memory-freshness.md` - instructions that tell Claude how to act on decay tags
+- `hooks/session-start.py` - freshness warnings, auto-archive, promotion, pitfall integration
+- `hooks/detect-pitfalls.py` - transcript parsing for user corrections
+- `hooks/compile-memories.py` - cluster detection and compilation planning
+- `rules/memory-freshness.md` - instructions that tell Claude how to act on all of this
 - `plugin.json` - Claude Code plugin manifest
-- `tests/test_lifecycle.py` - 32 tests covering every capability
+- `tests/` - 86 tests across three test suites
 
 ## Why it's built this way
 
@@ -104,13 +106,49 @@ verify_count: 3
 
 This resets the staleness clock (no archive for another 14 days) and counts toward promotion. Claude does this automatically when following the plugin's rules.
 
-## Roadmap
+## Pitfall detection
 
-**Shipping now (Phase 1):** Decay tagging, freshness warnings, auto-archive, promotion. All deterministic.
+This runs automatically at session start. The plugin reads the previous session's transcript and looks for moments where the user corrected a memory.
 
-**Next (Phase 2):**
-- Memory compilation - when 3+ related fast-decay memories are all archived, compile them into one slow-decay summary. Example: five "Josh demo status" updates become one "Josh Flashpoint engagement history."
-- Pitfall detection - when Claude acts on a memory and the user corrects it ("no, that changed"), auto-create a fast-decay memory recording the correction.
+Claude reads a memory that says "demo is active." You say "that's outdated, it ended last week." The plugin detects the correction pattern and creates a new fast-decay memory:
+
+```
+PITFALL DETECTION: 1 correction(s) from last session
+  -> pitfall_project_demo_2026-04-11.md
+(Auto-created fast-decay memories. Review and update the originals.)
+```
+
+Next session, Claude sees the pitfall warning, reads the original memory, and updates it. The stale fact gets corrected without you having to remember to fix it.
+
+The detection covers patterns like:
+- "that's changed / outdated / wrong / not true anymore"
+- "not anymore"
+- "we already moved past that"
+- "forget that"
+- "update: the meeting was cancelled"
+
+It only fires when Claude actually read a memory file before the correction. Random mentions of "that changed" in unrelated conversation don't trigger it.
+
+## Memory compilation
+
+When you accumulate several memories about the same topic (five separate "Josh demo status" updates over three weeks), you can compile them into one clean summary.
+
+Ask Claude to compile memories. The plugin identifies clusters of 3+ related memories (including archived ones), shows you the plan, and Claude merges them into a single slow-decay memory. The originals get archived.
+
+The compiled memory keeps the most recent facts and any decisions or lessons learned. Status updates and timestamps that are no longer relevant get dropped.
+
+This is the only part that uses Claude's intelligence. Everything else is date math.
+
+## What's inside
+
+Six files. ~550 lines of Python. Zero dependencies.
+
+- `hooks/session-start.py` - freshness warnings + auto-archive + promotion + pitfall integration
+- `hooks/detect-pitfalls.py` - transcript parsing for correction patterns
+- `hooks/compile-memories.py` - cluster detection and compilation planning
+- `rules/memory-freshness.md` - instructions that tell Claude how to act on all of this
+- `plugin.json` - Claude Code plugin manifest
+- `tests/` - 86 tests covering every capability
 
 ## License
 

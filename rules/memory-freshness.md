@@ -114,6 +114,34 @@ Claude Code may inject age-based warnings ("This memory is X days old"). The `de
 4. Asserting a deadline that already passed
 5. Recommending a tool integration based on credentials that expired
 
+## Pitfall detection (automatic)
+
+The SessionStart hook scans the previous session's transcript for correction patterns. When the user corrects a fact from memory ("that changed", "that's outdated", "not anymore"), the system auto-creates a fast-decay memory recording the correction.
+
+Pitfall memories are tagged `origin: pitfall_detection` and appear as `[FAST]` warnings at the next session start. They instruct you to update the original memory.
+
+When you see a pitfall memory:
+1. Read the pitfall to understand what was corrected
+2. Read the original memory it references
+3. Update the original with the corrected information
+4. If the original is fully outdated, archive it
+5. Archive the pitfall memory (it served its purpose)
+
+## Memory compilation (user-invoked)
+
+When the user asks to compile or consolidate memories, run `compile-memories.py` to identify clusters of 3+ related memories.
+
+Compilation rules:
+- Keep the most recent factual state, not the history of changes
+- Preserve decisions and lessons learned
+- Drop timestamps and status updates that are no longer relevant
+- If facts conflict between memories, keep the most recent one
+- Set `decay: slow` and `origin: compiled` on the compiled memory
+- Archive (don't delete) the source memories after compilation
+- Update MEMORY.md index
+
+Only compile when the user explicitly asks. Never auto-compile.
+
 ## Deterministic enforcement
 
-The SessionStart hook reads memory frontmatter and prints `[FAST]` warnings to context. The model sees warnings whether it remembers this rule file or not. The hook is the enforcement; this file is the spec.
+The SessionStart hook reads memory frontmatter and prints `[FAST]` warnings to context. It also runs pitfall detection on the previous session's transcript. The model sees warnings whether it remembers this rule file or not. The hook is the enforcement; this file is the spec.
