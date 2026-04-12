@@ -1,35 +1,26 @@
 # memory-lifecycle
 
-Memory freshness, auto-archive, and decay promotion for Claude Code.
+Every memory tool helps Claude remember things. This one tells Claude when to stop trusting what it remembers.
 
-Every other memory tool helps Claude remember. This one tells Claude when to stop trusting what it remembers.
+## What this solves
 
-## The problem
+Claude Code remembers facts between sessions. That's useful. The problem is it treats every fact as equally true forever.
 
-Claude Code's auto-memory saves facts across sessions but treats every memory as equally valid forever. A "demo is in progress" memory persists after the demo dies. A "wait until Apr 14" memory persists after Apr 14 passes. Claude acts confidently on dead information.
+You tell Claude "Josh is reviewing the demo this week, don't follow up until April 14." Claude saves that. April 20 rolls around. Claude still thinks Josh is mid-review and holds off on the follow-up. Six days of silence because Claude trusted a stale fact.
 
-## What this plugin does
-
-Tags memories with temporal trust (`decay: fast | medium | slow`), warns at session start when fast-decay memories need verification, auto-archives stale memories, and promotes verified memories to slower decay tiers.
-
-**Phase 1 (current):** All deterministic. No LLM in the loop. Pure Python, zero dependencies.
-
-## Install
-
-```bash
-claude plugin add /path/to/memory-lifecycle
-```
-
-Or from GitHub:
-```bash
-claude plugin add assafkip/memory-lifecycle
-```
+This plugin adds an expiration layer to Claude's memory.
 
 ## How it works
 
-### Decay tagging
+You tag each memory with how fast it goes stale.
 
-Add a `decay` field to memory file frontmatter:
+**fast** - changes day to day. Active demos, deadlines, "wait until Thursday," relationship status.
+
+**medium** - drifts over weeks. Team roles, config IDs, integration settings.
+
+**slow** - stable. Your preferences, process rules, voice conventions. This is the default.
+
+The tagging looks like this in the memory file:
 
 ```yaml
 ---
@@ -37,17 +28,16 @@ name: Josh demo engagement
 type: project
 decay: fast
 ---
-Josh is reviewing the demo this week. No follow-up needed until Apr 14.
+Josh is reviewing the demo this week. No follow-up until Apr 14.
 ```
 
-Three tiers:
-- **fast** - facts that flip day-to-day (demos, deadlines, relationship stages). Must verify before acting.
-- **medium** - facts that drift over weeks (IDs, team roles, configs). Should verify if acting on it.
-- **slow** (default) - stable facts (voice rules, process conventions). Trust unless contradicted.
+## What happens at every session start
 
-### Session start warnings
+The plugin checks all your memories and does three things:
 
-On every session start, the hook scans memory files and prints warnings:
+**1. Warns about fast-decay memories.**
+
+Claude sees this before doing anything:
 
 ```
 MEMORY FRESHNESS WARNING
@@ -56,71 +46,71 @@ These memories are marked decay: fast.
 MUST verify before acting on their content.
 
   [FAST] Josh demo engagement (project_josh-demo.md)
-  [FAST] Deadline for Antler IC (project_antler-deadline.md)
+  [FAST] Antler IC deadline (project_antler-deadline.md)
 ==================================================
 ```
 
-### Verification tracking
+Claude now checks whether Josh is still reviewing before deciding to hold off on follow-up.
 
-After verifying a memory is still true, Claude updates the frontmatter:
+**2. Archives stale memories automatically.**
+
+- Fast-decay memories go to archive after 14 days without being checked or updated
+- Medium-decay memories go after 60 days
+- Slow-decay memories stay forever
+
+Archived means moved to a subfolder. Not deleted. You can always pull them back.
+
+**3. Promotes verified memories.**
+
+When Claude checks a fast-decay memory and confirms it's still true, it records that check. After 3 verifications over 30+ days, the memory gets promoted to medium-decay. After 5 verifications over 60+ days, medium becomes slow.
+
+A fact that stayed true for a month and got checked three times is no longer volatile. The system recognizes that automatically.
+
+## Install
+
+```bash
+claude plugin add assafkip/memory-lifecycle
+```
+
+That's it. No config. No API keys. No database. The plugin hooks into Claude Code's session start and runs automatically.
+
+## What's inside
+
+Four files. 230 lines of Python. Zero dependencies.
+
+- `hooks/session-start.py` - the hook that checks, archives, and promotes
+- `rules/memory-freshness.md` - instructions that tell Claude how to act on decay tags
+- `plugin.json` - Claude Code plugin manifest
+- `tests/test_lifecycle.py` - 32 tests covering every capability
+
+## Why it's built this way
+
+**No database.** The memory files themselves are the database. The decay tag lives in the file's header. Nothing to sync, nothing to corrupt.
+
+**No background process.** The biggest memory tool in the ecosystem (claude-mem, 48K stars) runs a persistent HTTP server. Its top bugs are zombie processes and 110-second hangs on session close. This plugin runs once at session start, prints output, exits. Done.
+
+**No AI in the loop.** Every decision is date math. "Is this memory older than 14 days with no verification? Archive it." No prompts, no token costs, no hallucinated decisions about what to keep.
+
+**Archive, don't delete.** Stale memories move to a subfolder. Nothing is lost. You can restore any archived memory by dragging the file back.
+
+## Verification tracking
+
+When Claude checks a fast-decay memory and confirms it's still accurate, it updates two fields:
 
 ```yaml
 last_verified: 2026-04-11
 verify_count: 3
 ```
 
-This resets the staleness clock and contributes to promotion.
+This resets the staleness clock (no archive for another 14 days) and counts toward promotion. Claude does this automatically when following the plugin's rules.
 
-### Auto-archive
+## Roadmap
 
-Stale memories get archived automatically on session start:
-- `fast` decay: archived after 14 days without verification or update
-- `medium` decay: archived after 60 days
-- `slow` decay: never
+**Shipping now (Phase 1):** Decay tagging, freshness warnings, auto-archive, promotion. All deterministic.
 
-Archived files move to `memory/archived/`. Reversible.
-
-### Decay promotion
-
-Verified memories get promoted to slower decay:
-- `fast` with 3+ verifications and 30+ days old -> `medium`
-- `medium` with 5+ verifications and 60+ days old -> `slow`
-
-A fact that has been true for a month and verified three times is no longer fast-decay.
-
-## File structure
-
-```
-memory-lifecycle/
-  plugin.json              # Claude Code plugin manifest
-  hooks/
-    session-start.py       # Freshness + archive + promotion hook
-  rules/
-    memory-freshness.md    # Verification gate rules
-  tests/
-    test_lifecycle.py      # 32 tests covering all capabilities
-  README.md
-```
-
-## Design decisions
-
-- **No SQLite.** Frontmatter IS the database. Memories are small files. File I/O is fast enough.
-- **No background worker.** claude-mem's top bugs are zombie processes, port collisions, and 110-second stop-hook blocks. We avoid all of that.
-- **No LLM in the loop.** Every Phase 1 capability is deterministic. Date math, not prompt engineering.
-- **Archive, don't delete.** Safe forgetting. Every archived memory can be restored by moving it back.
-- **Exit 0 always.** The hook never blocks session start. It prints warnings, not errors.
-
-## Tests
-
-```bash
-python3 tests/test_lifecycle.py
-```
-
-## Roadmap (Phase 2)
-
-- Memory compilation: cluster 3+ related fast-decay memories into one slow-decay summary (LLM-assisted, user-invoked)
-- Pitfall detection: parse transcripts for "that's outdated" corrections, auto-create fast-decay memories
-- Marketplace submission
+**Next (Phase 2):**
+- Memory compilation - when 3+ related fast-decay memories are all archived, compile them into one slow-decay summary. Example: five "Josh demo status" updates become one "Josh Flashpoint engagement history."
+- Pitfall detection - when Claude acts on a memory and the user corrects it ("no, that changed"), auto-create a fast-decay memory recording the correction.
 
 ## License
 
