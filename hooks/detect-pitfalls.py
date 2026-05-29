@@ -9,7 +9,7 @@ Parses the most recent session transcript for patterns where:
 When detected, creates a fast-decay memory recording the correction
 so future sessions know the fact was invalidated.
 
-Borrowed from: claude-memory-engine's transcript pitfall detection
+Inspired by (concept only, original implementation): claude-memory-engine's transcript pitfall detection
 (retry loops, user corrections -> auto-recorded pitfalls).
 
 Exit 0 always. Prints summary of detected pitfalls.

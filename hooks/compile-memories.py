@@ -10,7 +10,7 @@ This script is deterministic. It identifies candidates and prints
 a compilation plan. The actual merging is done by Claude following
 the rules in memory-freshness.md (requires LLM for summarization).
 
-Borrowed from: claude-memory-compiler's daily-log -> knowledge-article
+Inspired by (concept only, original implementation): claude-memory-compiler's daily-log -> knowledge-article
 compilation pattern.
 
 Usage: python3 compile-memories.py [--dry-run]
