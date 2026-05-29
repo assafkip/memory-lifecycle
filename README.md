@@ -153,3 +153,7 @@ Six files. ~550 lines of Python. Zero dependencies.
 ## License
 
 MIT
+
+---
+
+I built this memory-decay layer for my own Claude Code setup and open-sourced it. I ship paid Claude Code kits for founders at https://claudedaddy.gumroad.com, and I build these systems for teams that want one wired to their own setup. Book a call: https://calendar.app.google/cMFvhvDsfi9iyWYy9
