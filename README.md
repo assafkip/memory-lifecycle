@@ -157,3 +157,14 @@ MIT
 ---
 
 I built this memory-decay layer for my own Claude Code setup and open-sourced it. I ship paid Claude Code kits for founders at https://claudedaddy.gumroad.com, and I build these systems for teams that want one wired to their own setup. Book a call: https://calendar.app.google/cMFvhvDsfi9iyWYy9
+
+
+---
+
+## Built by Assaf
+
+I spent 12 years in threat intelligence watching teams find the same failure and fix it four times. The learning never stuck. I build tools that make it stick.
+
+This is the free version. The paid kits live at [claudedaddy.io](https://claudedaddy.io).
+
+**Want this wired into your team's repo, or a heavier spec-and-review pipeline?** That's the consulting. [Book a call.](https://calendar.app.google/cMFvhvDsfi9iyWYy9)
